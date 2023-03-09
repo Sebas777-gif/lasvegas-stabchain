@@ -12,54 +12,60 @@ membership_test := function(C, x) # returns fail or transversal elements giving 
     else return fail; fi;
 end;
 
-extend_sc := function(C, x, B, pos)
-    local beta, g, i, extend_orb, orbit_length;
 
-    extend_orb := function(i, x)
-        local p;
-        p := Position(C.orbit, C.orbit[i]^x);
-        if p = fail then
-            Add(C.orbit, C.orbit[i]^x);
-            Add(C.transversal, C.transversal[i]*x);
-        else
-            extend_sc(C.next, C.transversal[i]*x / C.transversal[p], B, pos + 1);
-        fi;
-    end;
-
-    if membership_test(C, x) <> fail then return false; fi;
-    if C.generators = [] then # extend chain
-        if pos <= Length(B) then beta := B[pos]; else beta := SmallestMovedPointPerm(x); fi;
-        C.generators := [x];
-        C.orbit := []; C.transversal := []; C.next := rec(generators := []);
-        g := ();
-        repeat
-            Add(C.orbit, beta);
-            Add(C.transversal, g);
-            beta := beta^x;
-            g := g*x;
-        until beta = C.orbit[1];
-        extend_sc(C.next, g, B, pos+1);
-    else # extend orbit
-        Add(C.generators, x);
-        orbit_length := Length(C.orbit);
-        for  i in[1..orbit_length] do
-            extend_orb(i, x);
-        od;
-        i := orbit_length + 1;
-        while i <= Length(C.orbit) do
-            for g in C.generators do
-                extend_orb(i, g);
-            od;
-            i := i + 1;
-        od;
-    fi;
-    return true;
-end;
-
-schreier_sims := function(S, B...)
-    local C, x;
+random_schreier_sims := function(threshold, S, B...)
+    local C, cnt, extend_sc, x;
     if B <> [] then B := B[1]; fi;
     C := rec(generators := []);
+    cnt := 0;
+    extend_sc := function(C, x, B, pos)
+        local beta, g, i, extend_orb, orbit_length;
+
+        extend_orb := function(i, x)
+            local p, coin_flip;
+            p := Position(C.orbit, C.orbit[i]^x);
+            if p = fail then
+                Add(C.orbit, C.orbit[i]^x);
+                Add(C.transversal, C.transversal[i]*x);
+            else
+                extend_sc(C.next, C.transversal[i]*x / C.transversal[p], B, pos + 1);
+            fi;
+        end;
+
+        if cnt >= threshold then return; fi;
+
+        if membership_test(C, x) <> fail then
+            cnt := cnt + 1;
+            return;
+        fi;
+        cnt := 0;
+        if C.generators = [] then # extend chain
+            if pos <= Length(B) then beta := B[pos]; else beta := SmallestMovedPointPerm(x); fi;
+            C.generators := [x];
+            C.orbit := []; C.transversal := []; C.next := rec(generators := []);
+            g := ();
+            repeat
+                Add(C.orbit, beta);
+                Add(C.transversal, g);
+                beta := beta^x;
+                g := g*x;
+            until beta = C.orbit[1];
+            extend_sc(C.next, g, B, pos + 1);
+        else # extend orbit
+            Add(C.generators, x);
+            orbit_length := Length(C.orbit);
+            for i in[1..orbit_length] do
+                extend_orb(i, x);
+            od;
+            i := orbit_length + 1;
+            while i <= Length(C.orbit) do
+                for g in C.generators do
+                    extend_orb(i, g);
+                od;
+                i := i + 1;
+            od;
+        fi;
+    end;
     for x in S do extend_sc(C, x, B, 1); od;
     return C;
 end;
@@ -97,23 +103,6 @@ pseudo_random_init := function(w) # initialize with repititions of the generator
         pseudo_random(w, Y); # initial randomization
     od;
     return Y;
-end;
-
-random_schreier := function(w, S, B...)
-    local C, x, loops_without_extension, Y;
-    if B <> [] then B := B[1]; fi;
-    C := rec(generators := []);
-    loops_without_extension := 0;
-    Y := pseudo_random_init(S);
-    while loops_without_extension < w do
-        x := pseudo_random(S, Y);
-        if not extend_sc(C, x, B, 1) then
-            loops_without_extension := loops_without_extension + 1;
-        else
-            loops_without_extension := 0;
-        fi;
-    od;
-    return C;
 end;
 
 sanity_check := function(C, G)
