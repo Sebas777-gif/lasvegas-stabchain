@@ -13,32 +13,28 @@ membership_test := function(C, x) # returns fail or transversal elements giving 
 end;
 
 
-random_schreier_sims := function(threshold, S, B...)
-    local C, cnt, extend_sc, x;
+random_schreier_sims := function(p, S, B...)
+    local C, extend_sc, x;
     if B <> [] then B := B[1]; fi;
     C := rec(generators := []);
-    cnt := 0;
     extend_sc := function(C, x, B, pos)
         local beta, g, i, extend_orb, orbit_length;
 
         extend_orb := function(i, x)
-            local p, coin_flip;
-            p := Position(C.orbit, C.orbit[i]^x);
-            if p = fail then
+            local pos, coin_flip;
+            pos := Position(C.orbit, C.orbit[i]^x);
+            if pos = fail then
                 Add(C.orbit, C.orbit[i]^x);
-                Add(C.transversal, C.transversal[i]*x);
+                Add(C.transversal, C.transversal[i] * x);
             else
-                extend_sc(C.next, C.transversal[i]*x / C.transversal[p], B, pos + 1);
+                coin_flip := Random(1, 1000);
+                if coin_flip <= p then
+                    extend_sc(C.next, C.transversal[i] * x / C.transversal[pos], B, pos + 1);
+                fi;
             fi;
         end;
 
-        if cnt >= threshold then return; fi;
-
-        if membership_test(C, x) <> fail then
-            cnt := cnt + 1;
-            return;
-        fi;
-        cnt := 0;
+        if membership_test(C, x) <> fail then return; fi;
         if C.generators = [] then # extend chain
             if pos <= Length(B) then beta := B[pos]; else beta := SmallestMovedPointPerm(x); fi;
             C.generators := [x];
@@ -48,7 +44,7 @@ random_schreier_sims := function(threshold, S, B...)
                 Add(C.orbit, beta);
                 Add(C.transversal, g);
                 beta := beta^x;
-                g := g*x;
+                g := g * x;
             until beta = C.orbit[1];
             extend_sc(C.next, g, B, pos + 1);
         else # extend orbit
