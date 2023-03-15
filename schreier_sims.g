@@ -6,7 +6,7 @@ membership_test := function(C, x) # returns fail or transversal elements giving 
         if p = fail then return fail; fi;
         Add(L, C.transversal[p]);
         x := x / C.transversal[p];
-        C := C.next;
+        C := C.stabilizer;
     od;
     if x = () then return Reversed(L);
     else return fail; fi;
@@ -14,9 +14,10 @@ end;
 
 
 random_schreier_sims := function(p, S, B...)
-    local C, extend_sc, x;
+    local C, extend_sc, x, all_gens;
     if B <> [] then B := B[1]; fi;
-    C := rec(generators := []);
+    all_gens := [];
+    C := rec(generators := [], identity := (), genlabels := []);
     extend_sc := function(C, x, B, pos)
         local beta, g, i, extend_orb, orbit_length;
 
@@ -29,7 +30,7 @@ random_schreier_sims := function(p, S, B...)
             else
                 coin_flip := Random(1, 1000);
                 if coin_flip <= p then
-                    extend_sc(C.next, C.transversal[i] * x / C.transversal[pos], B, pos + 1);
+                    extend_sc(C.stabilizer, C.transversal[i] * x / C.transversal[pos], B, pos + 1);
                 fi;
             fi;
         end;
@@ -38,7 +39,11 @@ random_schreier_sims := function(p, S, B...)
         if C.generators = [] then # extend chain
             if pos <= Length(B) then beta := B[pos]; else beta := SmallestMovedPointPerm(x); fi;
             C.generators := [x];
-            C.orbit := []; C.transversal := []; C.next := rec(generators := []);
+            if not x in all_gens then
+                Add(all_gens, x);
+            fi;
+            C.genlabels := [Position(all_gens, x)];
+            C.orbit := []; C.transversal := []; C.stabilizer := rec(generators := [], identity := (), genlabels := []);
             g := ();
             repeat
                 Add(C.orbit, beta);
@@ -46,9 +51,13 @@ random_schreier_sims := function(p, S, B...)
                 beta := beta^x;
                 g := g * x;
             until beta = C.orbit[1];
-            extend_sc(C.next, g, B, pos + 1);
+            extend_sc(C.stabilizer, g, B, pos + 1);
         else # extend orbit
             Add(C.generators, x);
+            if not x in all_gens then
+                Add(all_gens, x);
+            fi;
+            Add(C.genlabels, Position(all_gens, x));
             orbit_length := Length(C.orbit);
             for i in[1..orbit_length] do
                 extend_orb(i, x);
@@ -99,20 +108,4 @@ pseudo_random_init := function(w) # initialize with repititions of the generator
         pseudo_random(w, Y); # initial randomization
     od;
     return Y;
-end;
-
-sanity_check := function(C, G)
-    while C.generators <> [] do
-        if not ForAll(C.generators,x -> x in G) then return "Generators not in G"; fi;
-        if Group(C.generators) <> G then return "Generators don't generate G"; fi;
-        if C.transversal[1] <> () then return "Bad first transversal"; fi;
-        if Length(C.orbit) <> Length(C.transversal) then return "Not same length"; fi;
-        if not ForAll([1..Length(C.orbit)],i -> C.orbit[1]^C.transversal[i] = C.orbit[i]) then 
-            return "Transversal wrong";
-        fi;
-        G := Stabilizer(G, C.orbit[1]);
-        C := C.next;
-    od;
-    if not IsTrivial(G) then return "Doesn't end with trivial group"; fi;
-    return true;
 end;

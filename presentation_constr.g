@@ -1,159 +1,159 @@
+gen_to_char := function(i)
+    # avoid '(', ')', '^', numerical characters and the character reversed for inversion
+    # we are assuming (or rather hoping) that there are no more than 242 generators
+    if i < 40 then
+        return CharInt(i);
+    fi;
+    if i < 46 then
+        return CharInt(i + 2);
+    fi;
+    if i < 82 then
+        return CharInt(i + 12);
+    fi;
+    return CharInt(i + 13);
+end;
+
+char_to_gen := function(c)
+    local i;
+    i := IntChar(c);
+    if i < 40 then
+        return i;
+    fi;
+    if i < 48 then
+        return i - 2;
+    fi;
+    if i < 94 then
+        return i - 12;
+    fi;
+    return i - 13;
+end;
+
 # for a presentation <m|r1> of N = <n> and <h|r2> of G/N, compute a presentation of G = <N, g>,
 # where h_i = N g_i
 construct_presentation := function(n, g, pr_normal, pr_quotient)
-    local m, h, r, r1, r2, r3, r4, new_pr, new_gens, new_rels, f, x, m_names, h_names,
-        convert_rel, rho, a, b, i, j;
+    local m, h, r, r1, r2, r3, r4, new_pr, new_gens, new_rels, f, x, m_names, h_names, g_names, new_gen_names,
+        rho, a, b, i, j, convert_rel;
     m := FreeGeneratorsOfFpGroup(pr_normal);
     r1 := RelatorsOfFpGroup(pr_normal);
     h := FreeGeneratorsOfFpGroup(pr_quotient);
     r2 := RelatorsOfFpGroup(pr_quotient);
     m_names := [];
     h_names := [];
+    new_gen_names := [];
+    g_names := [];
+    f := FreeGroup(Length(m) + Length(h));
+    new_gens := FreeGeneratorsOfFpGroup(f);
     for x in m do
         Add(m_names, StringFactorizationWord(x));
     od;
     for x in h do
         Add(h_names, StringFactorizationWord(x));
     od;
-    f := FreeGroup(Concatenation(m_names, h_names));
-    new_gens := FreeGeneratorsOfFpGroup(f);
-    new_rels := [];
-    # replace occurences of the hi in r with gi if b = 1,
-    # replace occurences of elmts of m with the corresponding gens in the new presentation if b = 2,
-    # replace occurences of elmts of h with the corresponding gens in the new presentation if b = 3
-    convert_rel := function(r, b)
-        local w, neutr, z, last_elm, c, k;
-        w := StringFactorizationWord(r);
-        if b = 1 then
-            neutr := ();
+    for i in [1..Length(new_gens)] do
+        Add(new_gen_names, [gen_to_char(i)]);
+    od;
+    for x in g do
+        Add(g_names, String(x));
+    od;
+    # replace occurences of the elmts of to_be_repl with elmts of repl_with
+    convert_rel := function(r, to_be_repl, repl_with, b)
+        local w, v, s, z, last_elm, c, k, exp, j;
+        if b then
+            w := StringFactorizationWord(r);
         else
-            neutr := new_gens[1]^0;
+            w := String(r);
         fi;
-        z := neutr;
-        last_elm := neutr;
-        j := 0;
-        while j < Length(w) do
-            j := j + 1;
-            c := w[j];
-            if c = '(' then
-                j := j + 1;
-                c := w[j];
-                while not c = ')' do
-                    if b = 1 then
-                        for i in [1..Length(h)] do
-                            if ReplacedString(String(c), "'", "") = h_names[i] then
-                                last_elm := last_elm * g[i];
-                                break;
-                            fi;
-                            if ReplacedString(String(c), "'", "") = UppercaseString(h_names[i]) then
-                                last_elm := last_elm / g[i];
-                                break;
-                            fi;
-                        od;
-                    fi;
-                    if b = 2 then
-                    for i in [1..Length(m)] do
-                        if ReplacedString(String(c), "'", "") = m_names[i] then
-                            last_elm := last_elm * new_gens[i];
-                            break;
-                        fi;
-                        if ReplacedString(String(c), "'", "") = UppercaseString(m_names[i]) then # inverses
-                            last_elm := last_elm / new_gens[i];
-                            break;
-                        fi;
-                    od;
-                    fi;
-                    if b = 3 then
-                        for i in [1..Length(h)] do
-                            if ReplacedString(String(c), "'", "") = h_names[i] then
-                                last_elm := last_elm * new_gens[Length(m) + i];
-                                break;
-                            fi;
-                            if ReplacedString(String(c), "'", "") = UppercaseString(h_names[i]) then # inverses
-                                last_elm := last_elm / new_gens[Length(m) + i];
-                                break;
-                            fi;
-                        od;
-                    fi;
-                    j := j + 1;
-                    c := w[j];
-                od;
-                j := j + 1;
-                c := w[j];
-                k := Int(ReplacedString(String(c), "'", "")); 
-                for i in [1..k] do
-                    z := z * last_elm;
-                od;
-                last_elm := neutr;
-                continue;
+        if w = "<identity>" then
+            if b then
+                return new_gens[1]^0;
             fi;
-            if IsDigitChar(c) then # handle exponents
-                k := Int(ReplacedString(String(c), "'", "")); # why is this so cumbersome
-                for i in [1..k-1] do
-                    z := z * last_elm;
-                od;
-                last_elm := neutr;
-                continue;
+            return ();
+        fi;
+        for i in [1..Length(to_be_repl)] do
+            s := to_be_repl[i];
+            v := ReplacedString(w, s, repl_with[i]);
+            w := v;
+            if b then # generator word
+                v := ReplacedString(w, LowercaseString(s), Concatenation(repl_with[i], [CharInt(255)]));
+            else # permutation
+                v := ReplacedString(w, LowercaseString(s), String(g[i]^-1));
             fi;
-            if b = 1 then
-                for i in [1..Length(h)] do
-                    if ReplacedString(String(c), "'", "") = h_names[i] then
-                        z := z * g[i];
-                        last_elm := g[i];
-                        break;
-                    fi;
-                    if ReplacedString(String(c), "'", "") = UppercaseString(h_names[i]) then # inverses
-                        z := z / g[i];
-                        last_elm := g[i]^-1;
-                        break;
-                    fi;
-                od;
-            fi;
-            if b = 2 then
-                for i in [1..Length(m)] do
-                    if ReplacedString(String(c), "'", "") = m_names[i] then
-                        z := z * new_gens[i];
-                        last_elm := new_gens[i];
-                        break;
-                    fi;
-                    if ReplacedString(String(c), "'", "") = UppercaseString(m_names[i]) then # inverses
-                        z := z / new_gens[i];
-                        last_elm := new_gens[i]^-1;
-                        break;
-                    fi;
-                od;
-            fi;
-            if b = 3 then
-                for i in [1..Length(h)] do
-                    if ReplacedString(String(c), "'", "") = h_names[i] then
-                        z := z * new_gens[Length(m) + i];
-                        last_elm := new_gens[Length(m) + i];
-                        break;
-                    fi;
-                    if ReplacedString(String(c), "'", "") = UppercaseString(h_names[i]) then # inverses
-                        z := z / new_gens[Length(m) + i];
-                        last_elm := new_gens[Length(m) + i]^-1;
-                        break;
-                    fi;
-                od;
-            fi;
+            w := v;
         od;
-        return z;
+        if b then
+            z := new_gens[1]^0;
+            last_elm := new_gens[1]^0;
+            i := 0;
+            while i < Length(w) do
+                i := i + 1;
+                c := w[i];
+                if c = '(' then
+                    i := i + 1;
+                    c := w[i];
+                    while not c = ')' do
+                        if i < Length(w) and w[i+1] = CharInt(255) then # inverse
+                            last_elm := last_elm / new_gens[char_to_gen(c)];
+                            i := i + 1;
+                        else
+                            last_elm := last_elm * new_gens[char_to_gen(c)];
+                        fi;
+                        i := i + 1;
+                        c := w[i];
+                    od;
+                    i := i + 1;
+                    k := [w[i]];
+                    while i < Length(w) and IsDigitChar(w[i+1]) do
+                        Add(k, w[i]);
+                        i := i + 1;
+                    od;
+                    exp := Int(k);
+                    for j in [1..exp] do
+                        z := z * last_elm;
+                    od;
+                    last_elm := new_gens[1]^0;
+                    continue;
+                fi;
+                if IsDigitChar(c) then
+                    k := [c];
+                    while i < Length(w) and IsDigitChar(w[i+1]) do
+                        Add(k, w[i]);
+                        i := i + 1;
+                    od;
+                    exp := Int(k);
+                    for j in [1..exp-1] do
+                        z := z * last_elm;
+                    od;
+                    last_elm := new_gens[1]^0;
+                    continue;
+                fi;
+                if i < Length(w) and w[i+1] = CharInt(255) then # inverse
+                    z := z / new_gens[char_to_gen(c)];
+                    last_elm := new_gens[char_to_gen(c)]^-1;
+                    i := i + 1;
+                else
+                    z := z * new_gens[char_to_gen(c)];
+                    last_elm := new_gens[char_to_gen(c)];
+                fi;
+            od;
+            return z;
+        fi;
+        return EvalString(w);
     end;
+    new_rels := [];
     for r in r1 do
-        Add(new_rels, convert_rel(r, 2));
+        Add(new_rels, convert_rel(r, m_names, new_gen_names{[1..Length(m)]}, true));
     od;
     rho := function(x)
         local hom, w;
         hom := EpimorphismFromFreeGroup(Group(n):names:=m_names);
         w := PreImagesRepresentative(hom, x);
-        return convert_rel(w, 2);
+        return convert_rel(w, m_names, new_gen_names{[1..Length(m)]}, true);
     end;
     r3 := [];
     r4 := [];
     for r in r2 do
-        a := convert_rel(r, 3);
-        b := convert_rel(r, 1);
+        a := convert_rel(r, h_names, new_gen_names{[Length(m)+1..Length(m)+Length(h)]}, true);
+        b := convert_rel(r, h_names, g_names, false);
         Add(r3, a / rho(b));
     od;
     for i in [1..Length(m)] do
