@@ -30,9 +30,10 @@ end;
 
 # for a presentation <m|r1> of N = <n> and <h|r2> of G/N, compute a presentation of G = <N, g>,
 # where h_i = N g_i
-construct_presentation := function(n, g, pr_normal, pr_quotient)
+# iter specifies the character used for the generator names, i.e. 1 -> A, 2 -> B, etc.
+construct_presentation := function(n, g, pr_normal, pr_quotient, iter)
     local m, h, r, r1, r2, r3, r4, new_pr, new_gens, new_rels, f, x, m_names, h_names, g_names, new_gen_names,
-        rho, a, b, i, j, convert_rel;
+        rho, a, b, i, j, convert_rel, ind, ind2;
     m := FreeGeneratorsOfFpGroup(pr_normal);
     r1 := RelatorsOfFpGroup(pr_normal);
     h := FreeGeneratorsOfFpGroup(pr_quotient);
@@ -41,20 +42,20 @@ construct_presentation := function(n, g, pr_normal, pr_quotient)
     h_names := [];
     new_gen_names := [];
     g_names := [];
-    f := FreeGroup(Length(m) + Length(h));
-    new_gens := FreeGeneratorsOfFpGroup(f);
     for x in m do
         Add(m_names, StringFactorizationWord(x));
     od;
     for x in h do
         Add(h_names, StringFactorizationWord(x));
     od;
-    for i in [1..Length(new_gens)] do
+    for i in [1..Length(m)+Length(h)] do
         Add(new_gen_names, [gen_to_char(i)]);
     od;
     for x in g do
         Add(g_names, String(x));
     od;
+    f := FreeGroup(Length(m) + Length(h) : generatorNames := [CharInt(64+iter)]);
+    new_gens := FreeGeneratorsOfFpGroup(f);
     # replace occurences of the elmts of to_be_repl with elmts of repl_with
     convert_rel := function(r, to_be_repl, repl_with, b)
         local w, v, s, z, last_elm, c, k, exp, j;
@@ -76,7 +77,7 @@ construct_presentation := function(n, g, pr_normal, pr_quotient)
             if b then # generator word
                 v := ReplacedString(w, LowercaseString(s), Concatenation(repl_with[i], [CharInt(255)]));
             else # permutation
-                v := ReplacedString(w, LowercaseString(s), String(g[i]^-1));
+                v := ReplacedString(w, LowercaseString(s), Concatenation("(", String(g[i]^-1), ")"));
             fi;
             w := v;
         od;
@@ -111,12 +112,11 @@ construct_presentation := function(n, g, pr_normal, pr_quotient)
                         z := z * last_elm;
                     od;
                     last_elm := new_gens[1]^0;
-                    continue;
                 fi;
                 if IsDigitChar(c) then
                     k := [c];
                     while i < Length(w) and IsDigitChar(w[i+1]) do
-                        Add(k, w[i]);
+                        Add(k, w[i+1]);
                         i := i + 1;
                     od;
                     exp := Int(k);
@@ -124,15 +124,18 @@ construct_presentation := function(n, g, pr_normal, pr_quotient)
                         z := z * last_elm;
                     od;
                     last_elm := new_gens[1]^0;
-                    continue;
-                fi;
-                if i < Length(w) and w[i+1] = CharInt(255) then # inverse
-                    z := z / new_gens[char_to_gen(c)];
-                    last_elm := new_gens[char_to_gen(c)]^-1;
-                    i := i + 1;
-                else
-                    z := z * new_gens[char_to_gen(c)];
-                    last_elm := new_gens[char_to_gen(c)];
+                    if i = Length(w) then
+                        return z;
+                    fi;
+                else 
+                    if i < Length(w) and w[i+1] = CharInt(255) then # inverse
+                        z := z / new_gens[char_to_gen(c)];
+                        last_elm := new_gens[char_to_gen(c)]^-1;
+                        i := i + 1;
+                    else
+                        z := z * new_gens[char_to_gen(c)];
+                        last_elm := new_gens[char_to_gen(c)];
+                    fi;
                 fi;
             od;
             return z;
@@ -156,10 +159,10 @@ construct_presentation := function(n, g, pr_normal, pr_quotient)
         b := convert_rel(r, h_names, g_names, false);
         Add(r3, a / rho(b));
     od;
-    for i in [1..Length(m)] do
-        for j in [1..Length(h)] do
-            a := new_gens[i]^new_gens[Length(m) + j];
-            b := n[i]^g[j];
+    for ind in [1..Length(m)] do
+        for ind2 in [1..Length(h)] do
+            a := new_gens[ind]^new_gens[Length(m) + ind2];
+            b := n[ind]^g[ind2];
             Add(r4, a / rho(b));
         od;
     od;
