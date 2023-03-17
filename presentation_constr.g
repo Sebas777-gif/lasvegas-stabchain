@@ -5,7 +5,7 @@
 # computes finite presentation for G using these things
 construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     local pr_quot, pr_normal, m, h, f, quot_gens, gen_copy, gen, new_gens, m_new, h_new, g, n, rho,
-        r1, r3, r4, i, j, r, a, b, c, d, new_pr, conv;
+        r1, r3, r4, i, j, r, a, b, c, d, new_pr, gens, pr_gens, x;
     pr_quot := Range(pr_quot_iso);
     pr_normal := Range(pr_normal_iso);
     m := FreeGeneratorsOfFpGroup(pr_normal);
@@ -15,15 +15,19 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     new_gens := FreeGeneratorsOfFpGroup(f);
     m_new := new_gens{[1..Length(m)]};
     h_new := new_gens{Length(m)+[1..Length(h)]};
-    gen_copy := ShallowCopy(quot_gens);
+    
     g := [];
-    Apply(gen_copy, elm -> PreImagesRepresentative(epi, elm));
-    for gen in gen_copy do
-        if gen <> () then
-            Add(g, gen);
+    for gen in GeneratorsOfGroup(pr_quot) do
+        x := PreImagesRepresentative(epi, PreImagesRepresentative(pr_quot_iso, gen));
+        if x <> () then
+            Add(g, x);
         fi;
     od;
-    n := GeneratorsOfGroup(Source(pr_normal_iso));
+
+    n := [];
+    for gen in GeneratorsOfGroup(pr_normal) do
+        Add(n, PreImagesRepresentative(pr_normal_iso, gen));
+    od;
 
     rho := function(x)
         return MappedWord(UnderlyingElement(pr_normal_iso(MappedWord(x, h, g))), m, m_new);
@@ -64,11 +68,23 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     r := Concatenation(r1, r3, r4);
     new_pr := f / r;
 
-    conv := function(x)
-        local w;
-        w := ExtRepOfObj(Factorization(G, x));
-        return ObjByExtRep(FamilyObj(new_gens[1]), w);
-    end;
+    pr_gens := GeneratorsOfGroup(new_pr);
+    gens := Concatenation(n, g);
+    for x in n do
+        i := Position(m, UnderlyingElement(pr_normal_iso(x)));
+        # it might happen that the isomorphism maps to the inverse if the generator is equal to its inverse
+        if i = fail then
+            i := Position(m, UnderlyingElement(pr_normal_iso(x)^-1));
+        fi;
+        gens[i] := x;
+    od;
+    for x in g do
+        i := Position(h, UnderlyingElement(pr_quot_iso(epi(x))));
+        if i = fail then
+            i := Position(h, UnderlyingElement(pr_quot_iso(epi(x))^-1));
+        fi;
+        gens[Length(m)+i] := x;
+    od;
 
-    return GroupHomomorphismByFunction(G, new_pr, conv);
+    return GroupHomomorphismByImagesNC(G, new_pr, gens, pr_gens);
 end;
