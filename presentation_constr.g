@@ -4,11 +4,10 @@
 # epi               epimorphism G -> G/N
 # computes finite presentation for G using these things
 construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
-    local pr_quot, pr_normal, m, h, f, quot_gens, new_gens, m_new, h_new, g, n, rho,
-        r1, r3, r4, i, j, r, a, b, c, d;
-
-    pr_quot := Image(pr_quot_iso);
-    pr_normal := Image(pr_normal_iso);
+    local pr_quot, pr_normal, m, h, f, quot_gens, gen_copy, gen, new_gens, m_new, h_new, g, n, rho,
+        r1, r3, r4, i, j, r, a, b, c, d, new_pr, conv;
+    pr_quot := Range(pr_quot_iso);
+    pr_normal := Range(pr_normal_iso);
     m := FreeGeneratorsOfFpGroup(pr_normal);
     h := FreeGeneratorsOfFpGroup(pr_quot);
     f := FreeGroup(Length(m) + Length(h));
@@ -16,8 +15,14 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     new_gens := FreeGeneratorsOfFpGroup(f);
     m_new := new_gens{[1..Length(m)]};
     h_new := new_gens{Length(m)+[1..Length(h)]};
-    g := ShallowCopy(quot_gens);
-    Apply(g, elm -> PreImagesRepresentative(epi, elm));
+    gen_copy := ShallowCopy(quot_gens);
+    g := [];
+    Apply(gen_copy, elm -> PreImagesRepresentative(epi, elm));
+    for gen in gen_copy do
+        if gen <> () then
+            Add(g, gen);
+        fi;
+    od;
     n := GeneratorsOfGroup(Source(pr_normal_iso));
 
     rho := function(x)
@@ -57,6 +62,13 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     od;
 
     r := Concatenation(r1, r3, r4);
-    return IsomorphismFpGroupByGenerators(G, GeneratorsOfGroup(G));
+    new_pr := f / r;
 
+    conv := function(x)
+        local w;
+        w := ExtRepOfObj(Factorization(G, x));
+        return ObjByExtRep(FamilyObj(new_gens[1]), w);
+    end;
+
+    return GroupHomomorphismByFunction(G, new_pr, conv);
 end;

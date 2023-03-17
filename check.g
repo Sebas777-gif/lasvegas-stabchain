@@ -11,5 +11,5 @@ check := function(C)
         new_pr := construct_presentation(cs[i], IsomorphismFpGroup(Image(epi)), p, epi);
         p := new_pr;
     od;
-    return Image(p);
+    return Range(p);
 end;
