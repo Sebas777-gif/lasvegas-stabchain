@@ -4,14 +4,13 @@
 # epi               epimorphism G -> G/N
 # computes finite presentation for G using these things
 construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
-    local pr_quot, pr_normal, m, h, f, quot_gens, gen_copy, gen, new_gens, m_new, h_new, g, n, rho,
+    local pr_quot, pr_normal, m, h, f, gen, new_gens, m_new, h_new, g, n, rho,
         r1, r3, r4, i, j, r, a, b, c, d, new_pr, gens, pr_gens, x;
     pr_quot := Range(pr_quot_iso);
     pr_normal := Range(pr_normal_iso);
     m := FreeGeneratorsOfFpGroup(pr_normal);
     h := FreeGeneratorsOfFpGroup(pr_quot);
     f := FreeGroup(Length(m) + Length(h));
-    quot_gens := GeneratorsOfGroup(Source(pr_quot_iso));
     new_gens := FreeGeneratorsOfFpGroup(f);
     m_new := new_gens{[1..Length(m)]};
     h_new := new_gens{Length(m)+[1..Length(h)]};
