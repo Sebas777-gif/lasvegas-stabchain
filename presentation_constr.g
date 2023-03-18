@@ -18,8 +18,9 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     
     n := [];
     for gen in GeneratorsOfGroup(pr_normal) do
-        Add(n, PreImagesRepresentative(pr_normal_iso, gen));
-        Add(gens, gen);
+        x := PreImage(pr_normal_iso, gen);
+        Add(n, x);
+        Add(gens, x);
     od;
     
     g := [];
@@ -27,7 +28,7 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
         x := PreImagesRepresentative(epi, PreImage(pr_quot_iso, gen));
         if x <> () then
             Add(g, x);
-            Add(gens, gen);
+            Add(gens, x);
         fi;
     od;
 
