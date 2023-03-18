@@ -14,18 +14,21 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     new_gens := FreeGeneratorsOfFpGroup(f);
     m_new := new_gens{[1..Length(m)]};
     h_new := new_gens{Length(m)+[1..Length(h)]};
+    gens := [];
     
-    g := [];
-    for gen in GeneratorsOfGroup(pr_quot) do
-        x := PreImagesRepresentative(epi, PreImagesRepresentative(pr_quot_iso, gen));
-        if x <> () then
-            Add(g, x);
-        fi;
-    od;
-
     n := [];
     for gen in GeneratorsOfGroup(pr_normal) do
         Add(n, PreImagesRepresentative(pr_normal_iso, gen));
+        Add(gens, gen);
+    od;
+    
+    g := [];
+    for gen in GeneratorsOfGroup(pr_quot) do
+        x := PreImagesRepresentative(epi, PreImage(pr_quot_iso, gen));
+        if x <> () then
+            Add(g, x);
+            Add(gens, gen);
+        fi;
     od;
 
     rho := function(x)
@@ -68,22 +71,6 @@ construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     new_pr := f / r;
 
     pr_gens := GeneratorsOfGroup(new_pr);
-    gens := Concatenation(n, g);
-    for x in n do
-        i := Position(m, UnderlyingElement(pr_normal_iso(x)));
-        # it might happen that the isomorphism maps to the inverse if the generator is equal to its inverse
-        if i = fail then
-            i := Position(m, UnderlyingElement(pr_normal_iso(x)^-1));
-        fi;
-        gens[i] := x;
-    od;
-    for x in g do
-        i := Position(h, UnderlyingElement(pr_quot_iso(epi(x))));
-        if i = fail then
-            i := Position(h, UnderlyingElement(pr_quot_iso(epi(x))^-1));
-        fi;
-        gens[Length(m)+i] := x;
-    od;
 
     return GroupHomomorphismByImagesNC(G, new_pr, gens, pr_gens);
 end;
