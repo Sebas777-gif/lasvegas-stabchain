@@ -1,111 +1,133 @@
-membership_test := function(C, x) # returns fail or transversal elements giving x
-    local L, p;
-    L := [];
-    while C.generators <> [] do
-        p := Position(C.orbit, C.orbit[1]^x);
-        if p = fail then return fail; fi;
-        Add(L, C.transversal[p]);
-        x := x / C.transversal[p];
-        C := C.stabilizer;
-    od;
-    if x = () then return Reversed(L);
-    else return fail; fi;
-end;
+randomized_stab_chain := function( gens, id, options)
+    local S,            # stabilizer chain
+          degree,       # degree of S
+          givenbase,    # list of points from which first base points should come
+          correct,      # boolean; true if a correct base is given
+          size,         # size of <G> as constructed
+          order,        # size of G if given in input
+          limit,        # upper bound on Size(G) given in input
+          orbits,       # list of orbits of G
+          orbits2,      # list of orbits of G
+          k,            # number of pairs of generators checked
+          param,        # list of parameters guiding number of repetitions
+                        # in random constructions
+          orbit_list,   # list indicating which orbit contains points in domain
+          basesize,     # list; i^th entry = number of base points in orbits[i]
+          i,j,
+          warning,      # used at warning if given and computed size differ
+          new,          # list of permutations to be added to stab. chain
+          result,       # output of checking phase; nontrivial if stabilizer
+                        # chain is incorrect
+          base,         # ordering of domain from which base points are taken
+          missing;      # if a correct base was provided by input, missing
+                        # contains those points of it which are not in
+                        # constructed base
 
-
-random_schreier_sims := function(p, S, B...)
-    local C, extend_sc, x, all_gens;
-    if B <> [] then B := B[1]; fi;
-    all_gens := [];
-    C := rec(generators := [], identity := (), genlabels := []);
-    extend_sc := function(C, x, B, pos)
-        local beta, g, i, extend_orb, orbit_length;
-
-        extend_orb := function(i, x)
-            local pos, coin_flip;
-            pos := Position(C.orbit, C.orbit[i]^x);
-            if pos = fail then
-                Add(C.orbit, C.orbit[i]^x);
-                Add(C.transversal, C.transversal[i] * x);
-            else
-                coin_flip := Random(1, 1000);
-                if coin_flip <= p then
-                    extend_sc(C.stabilizer, C.transversal[i] * x / C.transversal[pos], B, pos + 1);
-                fi;
-            fi;
-        end;
-
-        if membership_test(C, x) <> fail then return; fi;
-        if C.generators = [] then # extend chain
-            if pos <= Length(B) then beta := B[pos]; else beta := SmallestMovedPointPerm(x); fi;
-            C.generators := [x];
-            if not x in all_gens then
-                Add(all_gens, x);
-            fi;
-            C.genlabels := [Position(all_gens, x)];
-            C.orbit := []; C.transversal := []; C.stabilizer := rec(generators := [], identity := (), genlabels := []);
-            g := ();
-            repeat
-                Add(C.orbit, beta);
-                Add(C.transversal, g);
-                beta := beta^x;
-                g := g * x;
-            until beta = C.orbit[1];
-            extend_sc(C.stabilizer, g, B, pos + 1);
-        else # extend orbit
-            Add(C.generators, x);
-            if not x in all_gens then
-                Add(all_gens, x);
-            fi;
-            Add(C.genlabels, Position(all_gens, x));
-            orbit_length := Length(C.orbit);
-            for i in[1..orbit_length] do
-                extend_orb(i, x);
-            od;
-            i := orbit_length + 1;
-            while i <= Length(C.orbit) do
-                for g in C.generators do
-                    extend_orb(i, g);
-                od;
-                i := i + 1;
-            od;
-        fi;
-    end;
-    for x in S do extend_sc(C, x, B, 1); od;
-    return C;
-end;
-
-pseudo_random := function(w, Y) # generation of pseudo-random element from <w>
-    local a, r, s, t, e;
-    a := ();
-    r := Maximum(11, Length(w));
-    # pick two random list elements
-    s := Random([1..r]);
-    t := Random(Concatenation([1..s-1], [s+1..r]));
-    e := Random([-1, 1]); # random choice of product/quotient
-    if Random([1, 2]) = 1 then # random product order
-        Y[s] := Y[s] * Y[t]^e; # replace one list entry by product
-        a := a * Y[s]; # accumulate product
+    S:= rec( generators := ShallowCopy( gens ), identity := id );
+    if options.random = 1000 then
+       #case of deterministic computation with known size
+       k := 1;
     else
-        Y[s] := Y[t]^e * Y[s];
-        a := Y[s] * a;
+       k:=First([1..14],x->(3/5)^x<1-options.random/1000);
     fi;
-    return a;
-end;
 
-pseudo_random_init := function(w) # initialize with repititions of the generator set w
-    local k, r, i, Y;
-    k := Length(w);
-    r := Maximum(11, k);
-    Y := [];
-    for i in [1..k] do
-        Y[i] := w[i];
-    od;
-    for i in [k+1..r] do
-        Y[i] := Y[i-k];
-    od;
-    for i in [1..50] do # 50 is heuristic
-        pseudo_random(w, Y); # initial randomization
-    od;
-    return Y;
+    degree := LargestMovedPoint( S.generators );
+
+    if IsBound( options.knownBase) and
+      Length(options.knownBase)<4+LogInt(degree,10)  then
+        param:=[k,4,0,0,0,0];
+    else
+        param:=[QuoInt(k,2),4,QuoInt(k+1,2),4,50,5];
+        options:=ShallowCopy(options);
+        Unbind(options.knownBase);
+    fi;
+    if options.random <= 200 then
+       param[2] := 2;
+       param[4] := 2;
+    fi;
+
+    #param[1] = number of pairs of random subproducts from generators in
+    #           first checking phase
+    #param[2] = (number of random elements from created set)/S.diam
+    #           in first checking phase
+    #param[3] = number of pairs of random subproducts from generators in
+    #           second checking phase
+    #param[4] = (number of random elements from created set)/S.diam
+    #           in second checking phase
+    #param[5] = maximum size of orbits in  which we evaluate words on all
+    #           points of orbit
+    #param[6] = minimum number of random points from orbit to plug in to check
+    #           whether given word is identity on orbit
+
+
+    # prepare input of construction
+    if IsBound(options.base)  then
+        givenbase := options.base;
+    else
+        givenbase := [];
+    fi;
+
+    if IsBound(options.size) then
+        order := options.size;
+        warning := 0;
+        limit := 0;
+    else
+        order := 0;
+        if IsBound(options.limit) then
+            limit := options.limit;
+        else
+            limit := 0;
+        fi;
+    fi;
+
+    if IsBound( options.knownBase )  then
+        correct := true;
+    else
+        correct := false;
+    fi;
+
+    if correct then
+        # if correct  base was given as input, no need for orbit information
+        base:=Concatenation(givenbase,Difference(options.knownBase,givenbase));
+        missing := Set(options.knownBase);
+        basesize := [];
+        orbit_list := [];
+        orbits := [];
+    else
+        # create ordering of domain used in choosing base points and
+        # compute orbit information
+        base:=Concatenation(givenbase,Difference([1..degree],givenbase));
+        missing:=[];
+        orbits2:=OrbitsPerms(S.generators,[1..degree]);
+        #throw away one-element orbits
+        orbits:=[];
+        j:=0;
+        for i in [1..Length(orbits2)] do
+            if Length(orbits2[i]) >1 then
+               j:=j+1; orbits[j]:= orbits2[i];
+            fi;
+        od;
+        basesize:=[];
+        orbit_list:=[];
+        for i in [1..Length(orbits)] do
+            basesize[i]:=0;
+            for j in [1..Length(orbits[i])] do
+                orbit_list[orbits[i][j]]:=i;
+            od;
+        od;
+        # temporary solution to speed up of handling of lots of small orbits
+        # until compiler
+        if Length(orbits) > degree/40 then
+           param[1] := 0;
+           param[3] := k;
+        fi;
+    fi;
+
+    new:=S.generators;
+    SCRMakeStabStrong(S,new,param,orbits,orbit_list,basesize,base,correct,missing,true);
+    #restore usual record elements
+    if not IsBound(S.labels) then
+       S := SCRRestoredRecord(S);
+    fi;
+    return S;
 end;
