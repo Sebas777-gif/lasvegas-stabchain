@@ -6,6 +6,7 @@
 construct_presentation := function(G, pr_quot_iso, pr_normal_iso, epi)
     local pr_quot, pr_normal, m, h, f, gen, new_gens, m_new, h_new, g, n, rho,
         r1, r3, r4, i, j, r, a, b, c, d, new_pr, gens, pr_gens, x;
+        
     pr_quot := Range(pr_quot_iso);
     pr_normal := Range(pr_normal_iso);
     m := FreeGeneratorsOfFpGroup(pr_normal);
