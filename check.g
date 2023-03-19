@@ -161,6 +161,9 @@ check := function(C, S)
         if Size(Group(GeneratorsOfGroup(cs[i]))) <> Size(cs[i]) then
             return false;
         fi;
+        if not IsNormal(cs[i], cs[i+1]) then
+            return false;
+        fi;
         epi := NaturalHomomorphismByNormalSubgroup(cs[i], cs[i+1]);
         new_pr := construct_presentation(cs[i], IsomorphismFpGroup(Image(epi)), p, epi);
         p := new_pr;
