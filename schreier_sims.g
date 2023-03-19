@@ -1,3 +1,5 @@
+Read("check.g");
+
 randomized_stab_chain := function( gens, id, options)
     local S,            # stabilizer chain
           degree,       # degree of S
@@ -130,4 +132,16 @@ randomized_stab_chain := function( gens, id, options)
        S := SCRRestoredRecord(S);
     fi;
     return S;
+end;
+
+stab_chain_las_vegas := function(gens, p)
+    local sc;
+    if p = 1000 then
+        sc := randomized_stab_chain(gens, (), rec(random := 1000));
+    else
+        repeat
+            sc := randomized_stab_chain(gens, (), rec(random := p));
+        until check(sc, gens);
+    fi;
+    return sc;
 end;
